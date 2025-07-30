@@ -230,4 +230,3 @@ export function ProfessionalDocumentEditor({ setSubscriptionModalOpen }: Profess
     );
 }
 export default ProfessionalDocumentEditor;
-    
