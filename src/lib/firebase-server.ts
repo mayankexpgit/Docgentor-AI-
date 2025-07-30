@@ -1,34 +1,44 @@
 import { initializeApp, getApps, getApp, App, cert, ServiceAccount } from 'firebase-admin/app';
 import { getAuth as getAdminAuth, Auth } from 'firebase-admin/auth';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
-import serviceAccountJson from './firebase-service-account.json';
+
+const serviceAccount: ServiceAccount = {
+  type: process.env.FIREBASE_TYPE,
+  project_id: process.env.FIREBASE_PROJECT_ID,
+  private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+  private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  client_email: process.env.FIREBASE_CLIENT_EMAIL,
+  client_id: process.env.FIREBASE_CLIENT_ID,
+  auth_uri: process.env.FIREBASE_AUTH_URI,
+  token_uri: process.env.FIREBASE_TOKEN_URI,
+  auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_CERT_URL,
+  client_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL,
+  universe_domain: process.env.FIREBASE_UNIVERSE_DOMAIN,
+};
 
 let adminApp: App;
 let adminAuth: Auth;
 let db: Firestore;
 
-// Cast the imported JSON to the ServiceAccount type
-const serviceAccount = serviceAccountJson as ServiceAccount;
-
-// Check if the service account has the necessary properties
 if (serviceAccount && serviceAccount.project_id) {
-    if (!getApps().length) {
-        adminApp = initializeApp({
-            credential: cert(serviceAccount)
-        });
-    } else {
-        adminApp = getApp();
-    }
-    adminAuth = getAdminAuth(adminApp);
-    db = getFirestore(adminApp);
+  if (!getApps().length) {
+    adminApp = initializeApp({
+      credential: cert(serviceAccount),
+    });
+  } else {
+    adminApp = getApp();
+  }
+
+  adminAuth = getAdminAuth(adminApp);
+  db = getFirestore(adminApp);
 } else {
-    console.warn("Firebase Admin SDK service account key is missing or invalid in 'src/lib/firebase-service-account.json'. Server-side features will be limited.");
-    // @ts-ignore - Assign null to satisfy TypeScript when not configured.
-    adminApp = null;
-    // @ts-ignore
-    adminAuth = null;
-    // @ts-ignore
-    db = null;
+  console.warn("⚠️ Firebase service account environment variables are missing or invalid.");
+  // @ts-ignore
+  adminApp = null;
+  // @ts-ignore
+  adminAuth = null;
+  // @ts-ignore
+  db = null;
 }
 
 export { adminAuth as auth, db };
