@@ -181,7 +181,7 @@ export function SubscriptionModal({ isOpen, onOpenChange }: SubscriptionModalPro
         }
     };
     
-    const handleActivateDeveloperTrial = () => {
+    const handleActivateDeveloperTrial = async () => {
         if (!user) {
             toast({
                 title: 'Authentication Required',
@@ -191,23 +191,40 @@ export function SubscriptionModal({ isOpen, onOpenChange }: SubscriptionModalPro
             return;
         }
         
-        const DEVELOPER_TRIAL_CODE = 'dev2784docgentorai';
         console.log("Attempting to activate developer trial with code:", devCode);
         
-        if (devCode === DEVELOPER_TRIAL_CODE) {
-            console.log("Developer trial code validated, activating trial...");
-            subscribe('yearly', true);
-            setDevCode(''); // Clear the code after successful activation
-            onOpenChange(false);
-            toast({
-                title: 'Developer Trial Activated',
-                description: 'You now have premium access for 7 days.',
+        try {
+            // Server-side validation for developer trial code
+            const response = await fetch('/api/validate-developer-code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ developerCode: devCode })
             });
-        } else {
-            console.log("Invalid developer trial code entered:", devCode);
+            
+            const result = await response.json();
+            
+            if (response.ok && result.isValid) {
+                console.log("Developer trial code validated, activating trial...");
+                subscribe('yearly', true);
+                setDevCode(''); // Clear the code after successful activation
+                onOpenChange(false);
+                toast({
+                    title: 'Developer Trial Activated',
+                    description: 'You now have premium access for 7 days.',
+                });
+            } else {
+                console.log("Invalid developer trial code entered:", devCode);
+                toast({
+                    title: 'Invalid Code',
+                    description: result.message || 'The developer trial code is incorrect.',
+                    variant: 'destructive',
+                });
+            }
+        } catch (error) {
+            console.error("Error validating developer code:", error);
             toast({
-                title: 'Invalid Code',
-                description: 'The developer trial code is incorrect.',
+                title: 'Validation Error',
+                description: 'Unable to validate developer code. Please try again.',
                 variant: 'destructive',
             });
         }

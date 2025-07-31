@@ -100,23 +100,40 @@ export function SettingsPage() {
         });
     }
     
-    const handleUnlockControls = () => {
-        const ADMIN_SECRET_CODE = "admin649290docgentor@";
+    const handleUnlockControls = async () => {
         console.log("Attempting to unlock admin controls with code:", adminCode);
         
-        if (adminCode === ADMIN_SECRET_CODE) {
-            setIsControlsUnlocked(true);
-            setAdminCode(''); // Clear the code after successful unlock
-            toast({
-                title: "Admin Controls Unlocked",
-                description: "You can now modify app settings.",
+        try {
+            // Server-side validation instead of client-side hardcoding
+            const response = await fetch('/api/validate-admin-code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ adminCode })
             });
-        } else {
-            console.log("Invalid admin code entered:", adminCode);
+            
+            const result = await response.json();
+            
+            if (response.ok && result.isValid) {
+                setIsControlsUnlocked(true);
+                setAdminCode(''); // Clear the code after successful unlock
+                toast({
+                    title: "Admin Controls Unlocked",
+                    description: "You can now modify app settings.",
+                });
+            } else {
+                console.log("Invalid admin code entered:", adminCode);
+                toast({
+                    variant: 'destructive',
+                    title: "Invalid Code",
+                    description: result.message || "The admin code you entered is incorrect.",
+                });
+            }
+        } catch (error) {
+            console.error("Error validating admin code:", error);
             toast({
                 variant: 'destructive',
-                title: "Invalid Code",
-                description: "The admin code you entered is incorrect.",
+                title: "Validation Error",
+                description: "Unable to validate admin code. Please try again.",
             });
         }
     };
@@ -309,9 +326,6 @@ export function SettingsPage() {
                                         <Lock className="mx-auto h-8 w-8 text-muted-foreground" />
                                         <h3 className="font-semibold">Controls Locked</h3>
                                         <p className="text-sm text-muted-foreground">Enter the admin secret code to unlock settings.</p>
-                                        {process.env.NODE_ENV === 'development' && (
-                                            <p className="text-xs text-blue-600">Dev hint: admin649290docgentor@</p>
-                                        )}
                                         <div className="flex max-w-sm mx-auto gap-2">
                                             <Input 
                                                 type="password"
