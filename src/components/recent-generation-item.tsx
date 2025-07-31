@@ -55,6 +55,7 @@ const getToolName = (type: AnyRecentGeneration['type']) => {
         resume: 'Resume',
         analyzer: 'Analysis',
         illustrations: 'Illustration',
+        'watermark-adder': 'Watermark',
     };
     return nameMap[type] || 'Generation';
 }

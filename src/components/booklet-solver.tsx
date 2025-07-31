@@ -45,7 +45,7 @@ export function BookletSolver({ setSubscriptionModalOpen }: any) {
     const [isLoading, setIsLoading] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const { toast } = useToast();
-    const { user, getAccessToken, signIn } = useAuth();
+    const { user, getAccessToken, signInWithGoogle } = useAuth();
     const answerKeyRef = useRef<HTMLDivElement>(null);
     const { getToolState, setToolState } = useToolState<SolveBookletOutput>('solver');
     const { addRecentGeneration } = useRecentGenerations();
@@ -141,7 +141,7 @@ export function BookletSolver({ setSubscriptionModalOpen }: any) {
                 variant: "destructive",
                 title: t('toastLoginRequiredTitle'),
                 description: t('toastLoginRequiredDescription'),
-                action: <Button onClick={signIn}>Sign In</Button>
+                action: <Button onClick={() => signInWithGoogle()}>Sign In</Button>
             });
             return;
         }
@@ -152,7 +152,7 @@ export function BookletSolver({ setSubscriptionModalOpen }: any) {
                 variant: "destructive",
                 title: "Authentication Error",
                 description: "Could not get Google access token. Please sign in again.",
-                action: <Button onClick={signIn}>Sign In</Button>
+                action: <Button onClick={() => signInWithGoogle()}>Sign In</Button>
             });
             return;
         }
