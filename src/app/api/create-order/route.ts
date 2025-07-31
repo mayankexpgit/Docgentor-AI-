@@ -7,18 +7,26 @@ import { getAppSettings } from '@/ai/flows/get-app-settings';
 const keyId = process.env.RAZORPAY_KEY_ID;
 const keySecret = process.env.RAZORPAY_KEY_SECRET;
 
-if (!keyId || !keySecret) {
-    console.error('Razorpay Key ID or Key Secret is not defined in environment variables.');
-    throw new Error('Razorpay Key ID or Key Secret is not defined in environment variables.');
+// Only warn during development, handle gracefully at runtime
+if ((!keyId || !keySecret) && process.env.NODE_ENV !== 'production') {
+    console.warn('Razorpay Key ID or Key Secret is not defined in environment variables. Payment creation will fail.');
 }
 
-const instance = new Razorpay({
-    key_id: keyId,
-    key_secret: keySecret,
-});
+let instance: any = null;
+if (keyId && keySecret) {
+    instance = new Razorpay({
+        key_id: keyId,
+        key_secret: keySecret,
+    });
+}
 
 export async function POST(req: Request) {
     try {
+        if (!instance) {
+            console.error('Razorpay is not properly configured');
+            return NextResponse.json({ error: 'Payment service not configured.' }, { status: 500 });
+        }
+
         const { plan } = await req.json();
 
         if (!plan || (plan !== 'monthly' && plan !== 'yearly')) {

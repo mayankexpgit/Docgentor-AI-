@@ -15,7 +15,6 @@ import { Input } from "./ui/input";
 import { Separator } from "./ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
-import { getAppSettings, AppSettings } from "@/ai/flows/get-app-settings";
 
 interface SubscriptionModalProps {
     isOpen: boolean;
@@ -30,11 +29,18 @@ export function SubscriptionModal({ isOpen, onOpenChange }: SubscriptionModalPro
     const [isLoading, setIsLoading] = useState<null | 'monthly' | 'yearly'>(null);
     const [devCode, setDevCode] = useState('');
     const [freemiumCode, setFreemiumCode] = useState('');
-    const [liveSettings, setLiveSettings] = useState<AppSettings | null>(null);
+    const [liveSettings, setLiveSettings] = useState<any | null>(null); // Changed type to any as AppSettings is removed
 
     useEffect(() => {
         if (isOpen) {
-            getAppSettings()
+            // Use client-side API endpoint instead of server-side function
+            fetch('/api/get-app-settings')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch settings');
+                    }
+                    return response.json();
+                })
                 .then(setLiveSettings)
                 .catch(err => {
                     console.error("Failed to fetch latest prices:", err);
@@ -161,34 +167,85 @@ export function SubscriptionModal({ isOpen, onOpenChange }: SubscriptionModalPro
     };
 
     const handleActivateFreemium = async () => {
-        const settings = await getAppSettings();
-        if (!settings) {
-            toast({ title: "Error", description: "Could not verify code. Please try again.", variant: "destructive" });
-            return;
-        }
+        try {
+            // Use API endpoint instead of direct function call
+            const response = await fetch('/api/get-app-settings');
+            if (!response.ok) {
+                throw new Error('Could not verify code');
+            }
+            
+            const settings = await response.json();
+            if (!settings) {
+                toast({ title: "Error", description: "Could not verify code. Please try again.", variant: "destructive" });
+                return;
+            }
 
-        const isCodeExpired = settings.freemiumCodeExpiry ? new Date().getTime() > settings.freemiumCodeExpiry : true;
+            const isCodeExpired = settings.freemiumCodeExpiry ? new Date().getTime() > settings.freemiumCodeExpiry : true;
 
-        if (freemiumCode === settings.freemiumCode && !isCodeExpired) {
-            subscribe('freemium', false);
-            onOpenChange(false);
-        } else {
-            toast({
-                title: 'Invalid or Expired Code',
-                description: 'The Freemium activation code is incorrect or has expired.',
-                variant: 'destructive',
+            if (freemiumCode === settings.freemiumCode && !isCodeExpired) {
+                subscribe('freemium', false);
+                onOpenChange(false);
+            } else {
+                toast({
+                    title: 'Invalid or Expired Code',
+                    description: 'The Freemium activation code is incorrect or has expired.',
+                    variant: 'destructive',
+                });
+            }
+        } catch (error) {
+            console.error('Error validating freemium code:', error);
+            toast({ 
+                title: "Error", 
+                description: "Could not verify code. Please try again.", 
+                variant: "destructive" 
             });
         }
     };
     
-    const handleActivateDeveloperTrial = () => {
-        if (devCode === 'dev2784docgentorai') {
-            subscribe('yearly', true);
-            onOpenChange(false);
-        } else {
+    const handleActivateDeveloperTrial = async () => {
+        if (!user) {
             toast({
-                title: 'Invalid Code',
-                description: 'The developer trial code is incorrect.',
+                title: 'Authentication Required',
+                description: 'You must be signed in to activate a developer trial.',
+                variant: 'destructive',
+            });
+            return;
+        }
+        
+        console.log("Attempting to activate developer trial with code:", devCode);
+        
+        try {
+            // Server-side validation for developer trial code
+            const response = await fetch('/api/validate-developer-code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ developerCode: devCode })
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok && result.isValid) {
+                console.log("Developer trial code validated, activating trial...");
+                subscribe('yearly', true);
+                setDevCode(''); // Clear the code after successful activation
+                onOpenChange(false);
+                toast({
+                    title: 'Developer Trial Activated',
+                    description: 'You now have premium access for 7 days.',
+                });
+            } else {
+                console.log("Invalid developer trial code entered:", devCode);
+                toast({
+                    title: 'Invalid Code',
+                    description: result.message || 'The developer trial code is incorrect.',
+                    variant: 'destructive',
+                });
+            }
+        } catch (error) {
+            console.error("Error validating developer code:", error);
+            toast({
+                title: 'Validation Error',
+                description: 'Unable to validate developer code. Please try again.',
                 variant: 'destructive',
             });
         }
@@ -329,7 +386,15 @@ export function SubscriptionModal({ isOpen, onOpenChange }: SubscriptionModalPro
                                 <CardDescription>For testing and development purposes. This will grant temporary premium access.</CardDescription>
                              </CardHeader>
                              <CardContent>
-                                {subscription.status === 'trial' || subscription.status === 'active' ? (
+                                {!user ? (
+                                    <Alert variant="default" className="bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800">
+                                        <CheckCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                                        <AlertTitle className="text-yellow-800 dark:text-yellow-300">Authentication Required</AlertTitle>
+                                        <AlertDescription className="text-yellow-600 dark:text-yellow-400">
+                                            Please sign in to activate a developer trial.
+                                        </AlertDescription>
+                                    </Alert>
+                                ) : subscription.status === 'trial' || subscription.status === 'active' ? (
                                     <Alert variant="default" className="bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
                                         <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
                                         <AlertTitle className="text-green-800 dark:text-green-300">Trial or Premium is Active</AlertTitle>

@@ -28,7 +28,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Input } from "./ui/input";
 import { Slider } from "./ui/slider";
-import { getAppSettings, type AppSettings } from "@/ai/flows/get-app-settings";
 import { updateAppSettings } from "@/ai/flows/update-app-settings";
 import { Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
@@ -52,7 +51,7 @@ export function SettingsPage() {
     const [isSubscriptionModalOpen, setSubscriptionModalOpen] = React.useState(false);
     
     // Admin Mode State
-    const [appSettings, setAppSettings] = React.useState<AppSettings | null>(null);
+    const [appSettings, setAppSettings] = React.useState<any | null>(null); // Changed type to any as AppSettings is removed
     const [isLoadingSettings, setIsLoadingSettings] = React.useState(true);
     const [isUpdatingSettings, setIsUpdatingSettings] = React.useState(false);
     const [adminCode, setAdminCode] = React.useState('');
@@ -66,7 +65,14 @@ export function SettingsPage() {
     // Fetch app settings from server if user has trial
     React.useEffect(() => {
         if (subscription.status === 'trial') {
-            getAppSettings()
+            // Use API endpoint instead of direct function call
+            fetch('/api/get-app-settings')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch settings');
+                    }
+                    return response.json();
+                })
                 .then(settings => {
                     setAppSettings(settings);
                 })
@@ -100,33 +106,65 @@ export function SettingsPage() {
         });
     }
     
-    const handleUnlockControls = () => {
-        const ADMIN_SECRET_CODE = "admin649290docgentor@";
-        if (adminCode === ADMIN_SECRET_CODE) {
-            setIsControlsUnlocked(true);
-            toast({
-                title: "Admin Controls Unlocked",
-                description: "You can now modify app settings.",
+    const handleUnlockControls = async () => {
+        console.log("Attempting to unlock admin controls with code:", adminCode);
+        
+        try {
+            // Server-side validation instead of client-side hardcoding
+            const response = await fetch('/api/validate-admin-code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ adminCode })
             });
-        } else {
+            
+            const result = await response.json();
+            
+            if (response.ok && result.isValid) {
+                setIsControlsUnlocked(true);
+                setAdminCode(''); // Clear the code after successful unlock
+                toast({
+                    title: "Admin Controls Unlocked",
+                    description: "You can now modify app settings.",
+                });
+            } else {
+                console.log("Invalid admin code entered:", adminCode);
+                toast({
+                    variant: 'destructive',
+                    title: "Invalid Code",
+                    description: result.message || "The admin code you entered is incorrect.",
+                });
+            }
+        } catch (error) {
+            console.error("Error validating admin code:", error);
             toast({
                 variant: 'destructive',
-                title: "Invalid Code",
-                description: "The admin code you entered is incorrect.",
+                title: "Validation Error",
+                description: "Unable to validate admin code. Please try again.",
             });
         }
     };
 
     const handleAdminSettingsUpdate = async () => {
-        if (!appSettings || !user) return;
+        if (!appSettings || !user) {
+            toast({
+                variant: 'destructive',
+                title: 'Missing Requirements',
+                description: 'App settings or user information is missing.',
+            });
+            return;
+        }
         
         setIsUpdatingSettings(true);
         try {
+            console.log("Updating app settings for admin:", user.uid);
             await updateAppSettings({ ...appSettings, adminId: user.uid });
             
             // Refetch settings to get the new expiry date
-            const updatedSettings = await getAppSettings();
-            setAppSettings(updatedSettings);
+            const response = await fetch('/api/get-app-settings');
+            if (response.ok) {
+                const updatedSettings = await response.json();
+                setAppSettings(updatedSettings);
+            }
 
             toast({
                 title: "Settings Updated",
@@ -134,17 +172,26 @@ export function SettingsPage() {
             });
         } catch(error: any) {
             console.error("Failed to update app settings:", error);
+            
+            // Enhanced error handling
+            let errorMessage = 'Could not update settings on the server.';
+            if (error.message?.includes('Firestore')) {
+                errorMessage = 'Database connection error. Please check server configuration.';
+            } else if (error.message?.includes('Admin')) {
+                errorMessage = 'Admin authorization failed. Please check permissions.';
+            }
+            
             toast({
                 variant: 'destructive',
                 title: 'Update Failed',
-                description: error.message || 'Could not update settings on the server.',
+                description: error.message || errorMessage,
             });
         } finally {
             setIsUpdatingSettings(false);
         }
     }
     
-    const handleSettingChange = (key: keyof AppSettings, value: any) => {
+    const handleSettingChange = (key: string, value: any) => { // Changed type to string
         setAppSettings(prev => prev ? { ...prev, [key]: value } : null);
     }
 
@@ -269,9 +316,17 @@ export function SettingsPage() {
                         <CardDescription>Customize universal app settings in real-time. Changes will affect all users.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
+                        {/* Debug Information */}
+                        {process.env.NODE_ENV === 'development' && (
+                            <div className="text-xs text-muted-foreground bg-muted p-2 rounded">
+                                <strong>Debug Info:</strong> User: {user?.uid || 'Not logged in'} | Trial Status: {subscription.status} | Firebase: {user ? 'Connected' : 'Disconnected'}
+                            </div>
+                        )}
+                        
                         {isLoadingSettings ? (
                             <div className="flex items-center justify-center p-8">
                                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                                <span className="ml-2 text-sm text-muted-foreground">Loading admin settings...</span>
                             </div>
                         ) : appSettings ? (
                             <>
@@ -286,6 +341,7 @@ export function SettingsPage() {
                                                 placeholder="Enter admin code..."
                                                 value={adminCode}
                                                 onChange={(e) => setAdminCode(e.target.value)}
+                                                onKeyPress={(e) => e.key === 'Enter' && handleUnlockControls()}
                                             />
                                             <Button onClick={handleUnlockControls}>Unlock</Button>
                                         </div>
@@ -349,7 +405,23 @@ export function SettingsPage() {
                                 )}
                             </>
                         ) : (
-                           <p className="text-destructive">Could not load app settings.</p> 
+                           <Alert variant="destructive">
+                               <AlertTriangle className="h-4 w-4"/>
+                               <AlertTitle>Failed to Load Settings</AlertTitle>
+                               <AlertDescription>
+                                   Could not load app settings from the server. This might be due to:
+                                   <ul className="mt-2 list-disc list-inside text-sm">
+                                       <li>Firebase configuration issues</li>
+                                       <li>Network connectivity problems</li>
+                                       <li>Server authentication errors</li>
+                                   </ul>
+                                   {process.env.NODE_ENV === 'development' && (
+                                       <div className="mt-2 text-xs font-mono">
+                                           Check browser console for detailed error logs.
+                                       </div>
+                                   )}
+                               </AlertDescription>
+                           </Alert>
                         )}
                     </CardContent>
                 </Card>

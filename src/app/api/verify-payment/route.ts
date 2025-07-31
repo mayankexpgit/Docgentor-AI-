@@ -4,13 +4,18 @@ import crypto from 'crypto';
 
 const keySecret = process.env.RAZORPAY_KEY_SECRET;
 
-if (!keySecret) {
-    console.error('Razorpay Key Secret is not defined in environment variables.');
-    throw new Error('Razorpay Key Secret is not defined in environment variables.');
+// Only throw error at runtime, not during build
+if (!keySecret && process.env.NODE_ENV !== 'production') {
+    console.warn('Razorpay Key Secret is not defined in environment variables. Payment verification will fail.');
 }
 
 export async function POST(req: Request) {
     try {
+        if (!keySecret) {
+            console.error('Razorpay Key Secret is not configured');
+            return NextResponse.json({ error: 'Payment verification not configured.' }, { status: 500 });
+        }
+
         const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = await req.json();
 
         if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {

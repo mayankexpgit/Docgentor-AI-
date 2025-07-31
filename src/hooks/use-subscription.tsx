@@ -5,7 +5,6 @@ import { createContext, useContext, useState, ReactNode, useEffect, useCallback 
 import { useAuth } from './use-auth';
 import { useToast } from './use-toast';
 import { CheckCircle } from 'lucide-react';
-import { getAppSettings } from '@/ai/flows/get-app-settings';
 
 export type Plan = 'monthly' | 'yearly' | 'freemium' | 'none';
 export type SubscriptionStatus = 'active' | 'freemium' | 'trial' | 'inactive' | 'cancelled';
@@ -62,10 +61,18 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
 
                     // For freemium plans, check if the global code has expired
                     if (parsedSub.status === 'freemium') {
-                        const appSettings = await getAppSettings();
-                        const isCodeExpired = appSettings.freemiumCodeExpiry ? now > appSettings.freemiumCodeExpiry : true;
-                        if (isCodeExpired) {
-                            parsedSub = { ...defaultSubscription }; // Reset if freemium code is expired
+                        try {
+                            const response = await fetch('/api/get-app-settings');
+                            if (response.ok) {
+                                const appSettings = await response.json();
+                                const isCodeExpired = appSettings.freemiumCodeExpiry ? now > appSettings.freemiumCodeExpiry : true;
+                                if (isCodeExpired) {
+                                    parsedSub = { ...defaultSubscription }; // Reset if freemium code is expired
+                                }
+                            }
+                        } catch (error) {
+                            console.error('Error validating freemium status:', error);
+                            // Continue with existing subscription if validation fails
                         }
                     }
 
@@ -99,6 +106,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     
     const subscribe = useCallback((plan: Plan, isTrial: boolean) => {
         if (!user) {
+            console.log("Subscription attempt failed: No user logged in");
             toast({
                 variant: 'destructive',
                 title: 'Login Required',
@@ -106,8 +114,13 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
             });
             return;
         }
-        if (plan === 'none') return;
+        if (plan === 'none') {
+            console.log("Subscription attempt failed: Invalid plan 'none'");
+            return;
+        }
     
+        console.log(`Activating subscription: plan=${plan}, isTrial=${isTrial}, userId=${user.uid}`);
+        
         const now = new Date();
         let expiryDate: Date | null = null;
         let title = "Subscription Activated!";
@@ -120,6 +133,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
             title = "Developer Trial Activated!";
             description = ('You now have premium access for 7 days.');
             status = 'trial';
+            console.log(`Trial activated until: ${expiryDate.toISOString()}`);
         } else if (plan === 'monthly') {
             expiryDate = new Date(now.setMonth(now.getMonth() + 1));
             status = 'active';
@@ -140,6 +154,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
             expiryDate: expiryDate ? expiryDate.getTime() : null,
         };
     
+        console.log("New subscription object:", newSubscription);
         saveSubscription(newSubscription);
         
         toast({
