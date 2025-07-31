@@ -176,7 +176,7 @@ export function ExamPaperGenerator({ setSubscriptionModalOpen }: any) {
     const [activeTab, setActiveTab] = useState("paper");
     const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
     const { toast } = useToast();
-    const { user, getAccessToken, signIn } = useAuth();
+    const { user, getAccessToken, signInWithGoogle } = useAuth();
     const { getToolState, setToolState } = useToolState<GenerateExamPaperOutput>('exam');
     const { addRecentGeneration } = useRecentGenerations();
     const { subscription } = useSubscription();

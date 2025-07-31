@@ -53,7 +53,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { ProjectBlueprintGenerator } from '@/components/project-blueprint-generator';
 import { HandwritingConverter } from '@/components/handwriting-converter';
-import { ProfessionalDocumentEditor } from '@/components/professional-document-editor';
+import ProfessionalDocumentEditor from '@/components/professional-document-editor';
 import { SubscriptionModal } from '@/components/subscription-modal';
 import { useSubscription } from '@/hooks/use-subscription';
 import { cn } from '@/lib/utils';

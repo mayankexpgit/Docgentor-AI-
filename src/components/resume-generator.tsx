@@ -41,7 +41,11 @@ const formSchema = z.object({
   }),
 });
 
-export function ResumeGenerator() {
+interface ResumeGeneratorProps {
+    setSubscriptionModalOpen: (open: boolean) => void;
+}
+
+export function ResumeGenerator({ setSubscriptionModalOpen }: ResumeGeneratorProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const { toast } = useToast();
