@@ -28,26 +28,39 @@ const getAppSettingsFlow = ai.defineFlow(
   async () => {
     if (!db) {
       console.error("Firestore Admin is not initialized. Returning default settings.");
+      console.error("Check Firebase environment variables: FIREBASE_PROJECT_ID, FIREBASE_PRIVATE_KEY, etc.");
       return AppSettingsSchema.parse({});
     }
 
-    const settingsRef = db.collection('app-settings').doc('main');
-    const docSnap = await settingsRef.get();
+    try {
+      console.log("Fetching app settings from Firestore...");
+      const settingsRef = db.collection('app-settings').doc('main');
+      const docSnap = await settingsRef.get();
 
-    if (docSnap.exists) {
-      // Validate data from Firestore against our Zod schema
-      const result = AppSettingsSchema.safeParse(docSnap.data());
-      if (result.success) {
-        return result.data;
+      if (docSnap.exists) {
+        console.log("App settings document found in Firestore");
+        // Validate data from Firestore against our Zod schema
+        const result = AppSettingsSchema.safeParse(docSnap.data());
+        if (result.success) {
+          console.log("App settings validation successful:", result.data);
+          return result.data;
+        }
+        // If data is invalid, return default and log error
+        console.warn("Firestore 'app-settings' document has invalid data, returning defaults.", result.error);
+      } else {
+        console.log("App settings document not found, creating with defaults");
       }
-      // If data is invalid, return default and log error
-      console.warn("Firestore 'app-settings' document has invalid data, returning defaults.", result.error);
+      
+      // If document doesn't exist or is invalid, create it with default values
+      const defaultSettings = AppSettingsSchema.parse({});
+      await settingsRef.set(defaultSettings);
+      console.log("Created default app settings in Firestore:", defaultSettings);
+      return defaultSettings;
+    } catch (error) {
+      console.error("Error fetching app settings from Firestore:", error);
+      console.error("Returning default settings due to database error");
+      return AppSettingsSchema.parse({});
     }
-    
-    // If document doesn't exist or is invalid, create it with default values
-    const defaultSettings = AppSettingsSchema.parse({});
-    await settingsRef.set(defaultSettings);
-    return defaultSettings;
   }
 );
 

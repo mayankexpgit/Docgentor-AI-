@@ -182,10 +182,29 @@ export function SubscriptionModal({ isOpen, onOpenChange }: SubscriptionModalPro
     };
     
     const handleActivateDeveloperTrial = () => {
-        if (devCode === 'dev2784docgentorai') {
+        if (!user) {
+            toast({
+                title: 'Authentication Required',
+                description: 'You must be signed in to activate a developer trial.',
+                variant: 'destructive',
+            });
+            return;
+        }
+        
+        const DEVELOPER_TRIAL_CODE = 'dev2784docgentorai';
+        console.log("Attempting to activate developer trial with code:", devCode);
+        
+        if (devCode === DEVELOPER_TRIAL_CODE) {
+            console.log("Developer trial code validated, activating trial...");
             subscribe('yearly', true);
+            setDevCode(''); // Clear the code after successful activation
             onOpenChange(false);
+            toast({
+                title: 'Developer Trial Activated',
+                description: 'You now have premium access for 7 days.',
+            });
         } else {
+            console.log("Invalid developer trial code entered:", devCode);
             toast({
                 title: 'Invalid Code',
                 description: 'The developer trial code is incorrect.',
@@ -329,7 +348,15 @@ export function SubscriptionModal({ isOpen, onOpenChange }: SubscriptionModalPro
                                 <CardDescription>For testing and development purposes. This will grant temporary premium access.</CardDescription>
                              </CardHeader>
                              <CardContent>
-                                {subscription.status === 'trial' || subscription.status === 'active' ? (
+                                {!user ? (
+                                    <Alert variant="default" className="bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800">
+                                        <CheckCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                                        <AlertTitle className="text-yellow-800 dark:text-yellow-300">Authentication Required</AlertTitle>
+                                        <AlertDescription className="text-yellow-600 dark:text-yellow-400">
+                                            Please sign in to activate a developer trial.
+                                        </AlertDescription>
+                                    </Alert>
+                                ) : subscription.status === 'trial' || subscription.status === 'active' ? (
                                     <Alert variant="default" className="bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
                                         <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
                                         <AlertTitle className="text-green-800 dark:text-green-300">Trial or Premium is Active</AlertTitle>

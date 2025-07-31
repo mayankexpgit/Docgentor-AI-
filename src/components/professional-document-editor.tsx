@@ -83,4 +83,5 @@ function ProfessionalDocumentEditor() {
   );
 }
 
+export { ProfessionalDocumentEditor };
 export default ProfessionalDocumentEditor;

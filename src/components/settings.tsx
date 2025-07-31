@@ -102,13 +102,17 @@ export function SettingsPage() {
     
     const handleUnlockControls = () => {
         const ADMIN_SECRET_CODE = "admin649290docgentor@";
+        console.log("Attempting to unlock admin controls with code:", adminCode);
+        
         if (adminCode === ADMIN_SECRET_CODE) {
             setIsControlsUnlocked(true);
+            setAdminCode(''); // Clear the code after successful unlock
             toast({
                 title: "Admin Controls Unlocked",
                 description: "You can now modify app settings.",
             });
         } else {
+            console.log("Invalid admin code entered:", adminCode);
             toast({
                 variant: 'destructive',
                 title: "Invalid Code",
@@ -118,10 +122,18 @@ export function SettingsPage() {
     };
 
     const handleAdminSettingsUpdate = async () => {
-        if (!appSettings || !user) return;
+        if (!appSettings || !user) {
+            toast({
+                variant: 'destructive',
+                title: 'Missing Requirements',
+                description: 'App settings or user information is missing.',
+            });
+            return;
+        }
         
         setIsUpdatingSettings(true);
         try {
+            console.log("Updating app settings for admin:", user.uid);
             await updateAppSettings({ ...appSettings, adminId: user.uid });
             
             // Refetch settings to get the new expiry date
@@ -134,10 +146,19 @@ export function SettingsPage() {
             });
         } catch(error: any) {
             console.error("Failed to update app settings:", error);
+            
+            // Enhanced error handling
+            let errorMessage = 'Could not update settings on the server.';
+            if (error.message?.includes('Firestore')) {
+                errorMessage = 'Database connection error. Please check server configuration.';
+            } else if (error.message?.includes('Admin')) {
+                errorMessage = 'Admin authorization failed. Please check permissions.';
+            }
+            
             toast({
                 variant: 'destructive',
                 title: 'Update Failed',
-                description: error.message || 'Could not update settings on the server.',
+                description: error.message || errorMessage,
             });
         } finally {
             setIsUpdatingSettings(false);
@@ -269,9 +290,17 @@ export function SettingsPage() {
                         <CardDescription>Customize universal app settings in real-time. Changes will affect all users.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
+                        {/* Debug Information */}
+                        {process.env.NODE_ENV === 'development' && (
+                            <div className="text-xs text-muted-foreground bg-muted p-2 rounded">
+                                <strong>Debug Info:</strong> User: {user?.uid || 'Not logged in'} | Trial Status: {subscription.status} | Firebase: {user ? 'Connected' : 'Disconnected'}
+                            </div>
+                        )}
+                        
                         {isLoadingSettings ? (
                             <div className="flex items-center justify-center p-8">
                                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                                <span className="ml-2 text-sm text-muted-foreground">Loading admin settings...</span>
                             </div>
                         ) : appSettings ? (
                             <>
@@ -280,12 +309,16 @@ export function SettingsPage() {
                                         <Lock className="mx-auto h-8 w-8 text-muted-foreground" />
                                         <h3 className="font-semibold">Controls Locked</h3>
                                         <p className="text-sm text-muted-foreground">Enter the admin secret code to unlock settings.</p>
+                                        {process.env.NODE_ENV === 'development' && (
+                                            <p className="text-xs text-blue-600">Dev hint: admin649290docgentor@</p>
+                                        )}
                                         <div className="flex max-w-sm mx-auto gap-2">
                                             <Input 
                                                 type="password"
                                                 placeholder="Enter admin code..."
                                                 value={adminCode}
                                                 onChange={(e) => setAdminCode(e.target.value)}
+                                                onKeyPress={(e) => e.key === 'Enter' && handleUnlockControls()}
                                             />
                                             <Button onClick={handleUnlockControls}>Unlock</Button>
                                         </div>
@@ -349,7 +382,23 @@ export function SettingsPage() {
                                 )}
                             </>
                         ) : (
-                           <p className="text-destructive">Could not load app settings.</p> 
+                           <Alert variant="destructive">
+                               <AlertTriangle className="h-4 w-4"/>
+                               <AlertTitle>Failed to Load Settings</AlertTitle>
+                               <AlertDescription>
+                                   Could not load app settings from the server. This might be due to:
+                                   <ul className="mt-2 list-disc list-inside text-sm">
+                                       <li>Firebase configuration issues</li>
+                                       <li>Network connectivity problems</li>
+                                       <li>Server authentication errors</li>
+                                   </ul>
+                                   {process.env.NODE_ENV === 'development' && (
+                                       <div className="mt-2 text-xs font-mono">
+                                           Check browser console for detailed error logs.
+                                       </div>
+                                   )}
+                               </AlertDescription>
+                           </Alert>
                         )}
                     </CardContent>
                 </Card>
