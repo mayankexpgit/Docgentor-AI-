@@ -5,7 +5,6 @@ import { createContext, useContext, useState, ReactNode, useEffect, useCallback 
 import { useAuth } from './use-auth';
 import { useToast } from './use-toast';
 import { CheckCircle } from 'lucide-react';
-import { getAppSettings } from '@/ai/flows/get-app-settings';
 
 export type Plan = 'monthly' | 'yearly' | 'freemium' | 'none';
 export type SubscriptionStatus = 'active' | 'freemium' | 'trial' | 'inactive' | 'cancelled';
@@ -62,10 +61,18 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
 
                     // For freemium plans, check if the global code has expired
                     if (parsedSub.status === 'freemium') {
-                        const appSettings = await getAppSettings();
-                        const isCodeExpired = appSettings.freemiumCodeExpiry ? now > appSettings.freemiumCodeExpiry : true;
-                        if (isCodeExpired) {
-                            parsedSub = { ...defaultSubscription }; // Reset if freemium code is expired
+                        try {
+                            const response = await fetch('/api/get-app-settings');
+                            if (response.ok) {
+                                const appSettings = await response.json();
+                                const isCodeExpired = appSettings.freemiumCodeExpiry ? now > appSettings.freemiumCodeExpiry : true;
+                                if (isCodeExpired) {
+                                    parsedSub = { ...defaultSubscription }; // Reset if freemium code is expired
+                                }
+                            }
+                        } catch (error) {
+                            console.error('Error validating freemium status:', error);
+                            // Continue with existing subscription if validation fails
                         }
                     }
 

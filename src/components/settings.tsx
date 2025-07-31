@@ -28,7 +28,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Input } from "./ui/input";
 import { Slider } from "./ui/slider";
-import { getAppSettings, type AppSettings } from "@/ai/flows/get-app-settings";
 import { updateAppSettings } from "@/ai/flows/update-app-settings";
 import { Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
@@ -52,7 +51,7 @@ export function SettingsPage() {
     const [isSubscriptionModalOpen, setSubscriptionModalOpen] = React.useState(false);
     
     // Admin Mode State
-    const [appSettings, setAppSettings] = React.useState<AppSettings | null>(null);
+    const [appSettings, setAppSettings] = React.useState<any | null>(null); // Changed type to any as AppSettings is removed
     const [isLoadingSettings, setIsLoadingSettings] = React.useState(true);
     const [isUpdatingSettings, setIsUpdatingSettings] = React.useState(false);
     const [adminCode, setAdminCode] = React.useState('');
@@ -66,7 +65,14 @@ export function SettingsPage() {
     // Fetch app settings from server if user has trial
     React.useEffect(() => {
         if (subscription.status === 'trial') {
-            getAppSettings()
+            // Use API endpoint instead of direct function call
+            fetch('/api/get-app-settings')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch settings');
+                    }
+                    return response.json();
+                })
                 .then(settings => {
                     setAppSettings(settings);
                 })
@@ -154,8 +160,11 @@ export function SettingsPage() {
             await updateAppSettings({ ...appSettings, adminId: user.uid });
             
             // Refetch settings to get the new expiry date
-            const updatedSettings = await getAppSettings();
-            setAppSettings(updatedSettings);
+            const response = await fetch('/api/get-app-settings');
+            if (response.ok) {
+                const updatedSettings = await response.json();
+                setAppSettings(updatedSettings);
+            }
 
             toast({
                 title: "Settings Updated",
@@ -182,7 +191,7 @@ export function SettingsPage() {
         }
     }
     
-    const handleSettingChange = (key: keyof AppSettings, value: any) => {
+    const handleSettingChange = (key: string, value: any) => { // Changed type to string
         setAppSettings(prev => prev ? { ...prev, [key]: value } : null);
     }
 

@@ -15,7 +15,6 @@ import { Input } from "./ui/input";
 import { Separator } from "./ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
-import { getAppSettings, AppSettings } from "@/ai/flows/get-app-settings";
 
 interface SubscriptionModalProps {
     isOpen: boolean;
@@ -30,11 +29,18 @@ export function SubscriptionModal({ isOpen, onOpenChange }: SubscriptionModalPro
     const [isLoading, setIsLoading] = useState<null | 'monthly' | 'yearly'>(null);
     const [devCode, setDevCode] = useState('');
     const [freemiumCode, setFreemiumCode] = useState('');
-    const [liveSettings, setLiveSettings] = useState<AppSettings | null>(null);
+    const [liveSettings, setLiveSettings] = useState<any | null>(null); // Changed type to any as AppSettings is removed
 
     useEffect(() => {
         if (isOpen) {
-            getAppSettings()
+            // Use client-side API endpoint instead of server-side function
+            fetch('/api/get-app-settings')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch settings');
+                    }
+                    return response.json();
+                })
                 .then(setLiveSettings)
                 .catch(err => {
                     console.error("Failed to fetch latest prices:", err);
@@ -161,22 +167,37 @@ export function SubscriptionModal({ isOpen, onOpenChange }: SubscriptionModalPro
     };
 
     const handleActivateFreemium = async () => {
-        const settings = await getAppSettings();
-        if (!settings) {
-            toast({ title: "Error", description: "Could not verify code. Please try again.", variant: "destructive" });
-            return;
-        }
+        try {
+            // Use API endpoint instead of direct function call
+            const response = await fetch('/api/get-app-settings');
+            if (!response.ok) {
+                throw new Error('Could not verify code');
+            }
+            
+            const settings = await response.json();
+            if (!settings) {
+                toast({ title: "Error", description: "Could not verify code. Please try again.", variant: "destructive" });
+                return;
+            }
 
-        const isCodeExpired = settings.freemiumCodeExpiry ? new Date().getTime() > settings.freemiumCodeExpiry : true;
+            const isCodeExpired = settings.freemiumCodeExpiry ? new Date().getTime() > settings.freemiumCodeExpiry : true;
 
-        if (freemiumCode === settings.freemiumCode && !isCodeExpired) {
-            subscribe('freemium', false);
-            onOpenChange(false);
-        } else {
-            toast({
-                title: 'Invalid or Expired Code',
-                description: 'The Freemium activation code is incorrect or has expired.',
-                variant: 'destructive',
+            if (freemiumCode === settings.freemiumCode && !isCodeExpired) {
+                subscribe('freemium', false);
+                onOpenChange(false);
+            } else {
+                toast({
+                    title: 'Invalid or Expired Code',
+                    description: 'The Freemium activation code is incorrect or has expired.',
+                    variant: 'destructive',
+                });
+            }
+        } catch (error) {
+            console.error('Error validating freemium code:', error);
+            toast({ 
+                title: "Error", 
+                description: "Could not verify code. Please try again.", 
+                variant: "destructive" 
             });
         }
     };
